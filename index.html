@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactiu: Teorema de Nyquist-Shannon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        /* Estilització personalitzada dels deslliçadors */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            background: #2563eb;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <div class="max-w-5xl w-full mx-auto space-y-6">
+        
+        <!-- Capçalera -->
+        <header class="text-center space-y-2">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">Teorema de Nyquist-Shannon</h1>
+            <p class="text-slate-600 max-w-2xl mx-auto text-sm md:text-base">
+                Aquesta eina permet explorar com el mostreig afecta la reconstrucció d'un senyal continu. 
+                Per evitar la pèrdua d'informació i l'efecte d'aliàsing, la freqüència de mostreig ha de ser estrictament superior al doble de la freqüència màxima del senyal original.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Panell de Controls -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-8">
+                <div>
+                    <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        Paràmetres
+                    </h2>
+                    
+                    <!-- Freqüència del senyal -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-end">
+                            <label for="freqSignal" class="text-sm font-medium text-slate-700">Freqüència del senyal (<span class="italic">f</span>)</label>
+                            <span id="valSignal" class="text-lg font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">3 Hz</span>
+                        </div>
+                        <input type="range" id="freqSignal" min="1" max="10" step="1" value="3">
+                        <div class="flex justify-between text-xs text-slate-400 font-medium">
+                            <span>1 Hz</span>
+                            <span>10 Hz</span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200">
+
+                <!-- Freqüència de mostreig -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label for="freqSample" class="text-sm font-medium text-slate-700">Freqüència de mostreig (<span class="italic">f<sub>s</sub></span>)</label>
+                        <span id="valSample" class="text-lg font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md">20 Hz</span>
+                    </div>
+                    <input type="range" id="freqSample" min="1" max="40" step="1" value="20">
+                    <div class="flex justify-between text-xs text-slate-400 font-medium">
+                        <span>1 Hz</span>
+                        <span>40 Hz</span>
+                    </div>
+                </div>
+
+                <!-- Plafó d'Estat -->
+                <div id="statusPanel" class="mt-8 p-4 rounded-xl transition-colors duration-300 border-2">
+                    <div class="flex items-center gap-3 mb-1">
+                        <div id="statusIcon"></div>
+                        <h3 id="statusTitle" class="font-bold text-lg">Estat</h3>
+                    </div>
+                    <p id="statusMessage" class="text-sm opacity-90"></p>
+                </div>
+            </div>
+
+            <!-- Àrea de Visualització -->
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-2 flex flex-col">
+                <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                    <h2 class="text-xl font-semibold">Visualització (1 segon)</h2>
+                    
+                    <!-- Llegenda -->
+                    <div class="flex gap-4 text-sm font-medium bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-1 bg-slate-300 rounded"></div>
+                            <span>Senyal original</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span>Mostres</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-1 bg-purple-600 rounded"></div>
+                            <span>Reconstrucció</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="canvas-container" class="flex-grow bg-white rounded-xl border border-slate-200 overflow-hidden shadow-inner">
+                    <canvas id="nyquistCanvas"></canvas>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // Elements del DOM
+        const canvas = document.getElementById('nyquistCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        
+        const sliderSignal = document.getElementById('freqSignal');
+        const sliderSample = document.getElementById('freqSample');
+        const valSignal = document.getElementById('valSignal');
+        const valSample = document.getElementById('valSample');
+        
+        const statusPanel = document.getElementById('statusPanel');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusIcon = document.getElementById('statusIcon');
+
+        // Variables d'estat
+        let f = parseInt(sliderSignal.value);
+        let fs = parseInt(sliderSample.value);
+
+        // Icones SVG per l'estat
+        const iconSuccess = `<svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+        const iconWarning = `<svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+
+        // Redimensionar canvas automàticament
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Funció Sinc matemàtica (normalitzada)
+        function sinc(x) {
+            if (x === 0) return 1;
+            return Math.sin(Math.PI * x) / (Math.PI * x);
+        }
+
+        // Actualitzar interfície i dades
+        function updateState() {
+            f = parseInt(sliderSignal.value);
+            fs = parseInt(sliderSample.value);
+            
+            valSignal.textContent = `${f} Hz`;
+            valSample.textContent = `${fs} Hz`;
+
+            const nyquistRate = 2 * f;
+            const isCompliant = fs > nyquistRate;
+
+            if (isCompliant) {
+                statusPanel.className = "mt-8 p-4 rounded-xl transition-colors duration-300 border-2 bg-emerald-50 border-emerald-200 text-emerald-900";
+                statusIcon.innerHTML = iconSuccess;
+                statusTitle.textContent = "Condició complerta";
+                statusMessage.innerHTML = `La freqüència de mostreig (<strong>${fs} Hz</strong>) és superior al doble de la freqüència del senyal (<strong>${nyquistRate} Hz</strong>). El senyal es pot reconstruir correctament.`;
+            } else {
+                statusPanel.className = "mt-8 p-4 rounded-xl transition-colors duration-300 border-2 bg-amber-50 border-amber-300 text-amber-900";
+                statusIcon.innerHTML = iconWarning;
+                statusTitle.textContent = "Avís d'Aliàsing";
+                statusMessage.innerHTML = `La freqüència de mostreig (<strong>${fs} Hz</strong>) és insuficient per un senyal de <strong>${f} Hz</strong>. Això provoca un solapament de freqüències (aliàsing) i una reconstrucció errònia.`;
+            }
+
+            draw();
+        }
+
+        // Dibuixar elements al canvas
+        function draw() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const midY = height / 2;
+            const amplitude = (height / 2) * 0.8; // 80% de l'alçada disponible
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Graella i eix X
+            ctx.beginPath();
+            ctx.moveTo(0, midY);
+            ctx.lineTo(width, midY);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Dibuixar línies de temps (cada 0.1s)
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Inter';
+            ctx.textAlign = 'center';
+            for(let i=0; i<=10; i+=1) {
+                const x = (i/10) * width;
+                ctx.beginPath();
+                ctx.moveTo(x, midY - 5);
+                ctx.lineTo(x, midY + 5);
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.stroke();
+                if(i > 0 && i < 10) ctx.fillText(`${(i/10).toFixed(1)}s`, x, midY + 20);
+            }
+            ctx.fillText("0s", 10, midY + 20);
+            ctx.fillText("1s", width - 10, midY + 20);
+
+            const dt = 0.002; // Resolució temporal per a les línies contínues
+
+            // 1. Dibuixar Senyal Original
+            ctx.beginPath();
+            for (let t = 0; t <= 1; t += dt) {
+                const y = Math.sin(2 * Math.PI * f * t);
+                const px = t * width;
+                const py = midY - (y * amplitude);
+                
+                if (t === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = '#cbd5e1'; // Gris/Blauet clar
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // 2. Calcular i dibuixar la Reconstrucció (Interpolació de Whittaker-Shannon)
+            ctx.beginPath();
+            for (let t = 0; t <= 1; t += dt) {
+                let xr = 0;
+                // Agrupem mostres d'abans i després per minimitzar l'efecte de vora en la visualització
+                const nMin = -Math.ceil(fs);
+                const nMax = Math.ceil(fs * 2);
+                
+                for (let n = nMin; n <= nMax; n++) {
+                    const ts = n / fs;
+                    const sampleValue = Math.sin(2 * Math.PI * f * ts);
+                    xr += sampleValue * sinc(fs * (t - ts));
+                }
+
+                const px = t * width;
+                const py = midY - (xr * amplitude);
+                
+                if (t === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = '#9333ea'; // Lila
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // 3. Dibuixar Punts de Mostreig
+            for (let n = 0; n <= fs; n++) {
+                const t = n / fs;
+                if(t > 1) break; // Només 1 segon
+
+                const y = Math.sin(2 * Math.PI * f * t);
+                const px = t * width;
+                const py = midY - (y * amplitude);
+
+                // Línia vertical fina fins a l'eix
+                ctx.beginPath();
+                ctx.moveTo(px, midY);
+                ctx.lineTo(px, py);
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)'; // Vermell transparent
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Punt de mostra
+                ctx.beginPath();
+                ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444'; // Vermell
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        // Escoltar els esdeveniments dels deslliçadors
+        sliderSignal.addEventListener('input', updateState);
+        sliderSample.addEventListener('input', updateState);
+
+        // Inicialització
+        window.onload = () => {
+            resizeCanvas();
+            updateState();
+        };
+
+    </script>
+</body>
+</html>
