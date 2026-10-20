@@ -19,6 +19,9 @@
             -webkit-appearance: none;
             width: 100%;
             background: transparent;
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
         }
 
         input[type=range]::-webkit-slider-thumb {
@@ -71,7 +74,7 @@
 </head>
 <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
 
-    <div class="max-w-5xl w-full mx-auto space-y-6 flex-grow">
+    <div class="max-w-6xl w-full mx-auto space-y-6 flex-grow">
         
         <!-- Capçalera -->
         <header class="text-center space-y-2">
@@ -85,7 +88,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <!-- Panell de Controls -->
-            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-8">
+            <div class="glass-panel rounded-2xl p-6 lg:col-span-1 space-y-6">
                 <div>
                     <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
                         <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
@@ -118,6 +121,37 @@
                     <div class="flex justify-between text-xs text-slate-400 font-medium">
                         <span>1 Hz</span>
                         <span>40 Hz</span>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200">
+
+                <!-- Controls d'Àudio -->
+                <div class="space-y-4">
+                    <h3 class="text-md font-semibold text-slate-800 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Retorn d'àudio
+                    </h3>
+
+                    <!-- Volum -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-end">
+                            <label for="volumeSlider" class="text-sm font-medium text-slate-600">Volum general</label>
+                            <span id="valVolume" class="text-sm font-bold text-slate-600">50%</span>
+                        </div>
+                        <input type="range" id="volumeSlider" min="0" max="100" step="1" value="50" class="!h-1">
+                    </div>
+
+                    <!-- Botons -->
+                    <div class="flex flex-col gap-2 mt-4">
+                        <button id="btnPlayOriginal" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors border border-slate-300 flex justify-center items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Escoltar Senyal Original
+                        </button>
+                        <button id="btnPlayRecon" class="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded-lg transition-colors border border-purple-200 flex justify-center items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Escoltar Reconstrucció
+                        </button>
                     </div>
                 </div>
 
@@ -178,18 +212,129 @@
         const valSignal = document.getElementById('valSignal');
         const valSample = document.getElementById('valSample');
         
+        const volumeSlider = document.getElementById('volumeSlider');
+        const valVolume = document.getElementById('valVolume');
+        const btnPlayOriginal = document.getElementById('btnPlayOriginal');
+        const btnPlayRecon = document.getElementById('btnPlayRecon');
+
         const statusPanel = document.getElementById('statusPanel');
         const statusTitle = document.getElementById('statusTitle');
         const statusMessage = document.getElementById('statusMessage');
         const statusIcon = document.getElementById('statusIcon');
 
-        // Variables d'estat
+        // Variables d'estat visual
         let f = parseInt(sliderSignal.value);
         let fs = parseInt(sliderSample.value);
+        let reconstructedMaxAmplitude = 1.0;
 
-        // Icones SVG per l'estat
+        // Variables d'àudio
+        let audioCtx;
+        let masterGain;
+        let oscOriginal;
+        let oscRecon;
+        let origGainNode;
+        let reconGainNode;
+        let isPlayingOriginal = false;
+        let isPlayingRecon = false;
+
+        // Icones SVG per l'estat i botons
         const iconSuccess = `<svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
         const iconWarning = `<svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+        const iconPlay = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+        const iconStop = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v4H9z"></path></svg>`;
+
+        // Funcions d'Àudio
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.connect(audioCtx.destination);
+                updateVolume();
+            }
+        }
+
+        function updateVolume() {
+            if (masterGain) {
+                // Limitem el volum màxim a un 40% per evitar sons massa estridents
+                const vol = (parseInt(volumeSlider.value) / 100) * 0.4; 
+                masterGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.05);
+            }
+            valVolume.textContent = `${volumeSlider.value}%`;
+        }
+
+        // Càlcul de la freqüència reflectida (aliàsing)
+        function getAliasFrequency(freq, sampleRate) {
+            let k = Math.round(freq / sampleRate);
+            return Math.abs(freq - k * sampleRate);
+        }
+
+        function toggleOriginal() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (isPlayingOriginal) {
+                if (oscOriginal) {
+                    oscOriginal.stop();
+                    oscOriginal.disconnect();
+                }
+                isPlayingOriginal = false;
+                btnPlayOriginal.innerHTML = `${iconPlay} Escoltar Senyal Original`;
+                btnPlayOriginal.className = "w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors border border-slate-300 flex justify-center items-center gap-2";
+            } else {
+                if (isPlayingRecon) toggleRecon(); // Aturar l'altre
+
+                oscOriginal = audioCtx.createOscillator();
+                oscOriginal.type = 'sine';
+                // Multipliquem per 100 per moure-ho a l'espectre audible (3Hz -> 300Hz)
+                oscOriginal.frequency.setValueAtTime(f * 100, audioCtx.currentTime);
+                
+                origGainNode = audioCtx.createGain();
+                origGainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); // Amplitud màxima (1.0)
+                
+                oscOriginal.connect(origGainNode);
+                origGainNode.connect(masterGain);
+                oscOriginal.start();
+                
+                isPlayingOriginal = true;
+                btnPlayOriginal.innerHTML = `${iconStop} Aturar Senyal Original`;
+                btnPlayOriginal.className = "w-full py-2.5 bg-slate-300 hover:bg-slate-400 text-slate-800 font-semibold rounded-lg transition-colors border border-slate-400 flex justify-center items-center gap-2 shadow-inner";
+            }
+        }
+
+        function toggleRecon() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (isPlayingRecon) {
+                if (oscRecon) {
+                    oscRecon.stop();
+                    oscRecon.disconnect();
+                }
+                isPlayingRecon = false;
+                btnPlayRecon.innerHTML = `${iconPlay} Escoltar Reconstrucció`;
+                btnPlayRecon.className = "w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded-lg transition-colors border border-purple-200 flex justify-center items-center gap-2";
+            } else {
+                if (isPlayingOriginal) toggleOriginal(); // Aturar l'altre
+
+                oscRecon = audioCtx.createOscillator();
+                oscRecon.type = 'sine';
+                
+                let aliasFreq = getAliasFrequency(f, fs);
+                oscRecon.frequency.setValueAtTime(aliasFreq * 100, audioCtx.currentTime);
+                
+                reconGainNode = audioCtx.createGain();
+                // Utilitzem l'amplitud calculada a la gràfica (si és pla, serà 0)
+                reconGainNode.gain.setValueAtTime(reconstructedMaxAmplitude, audioCtx.currentTime);
+                
+                oscRecon.connect(reconGainNode);
+                reconGainNode.connect(masterGain);
+                oscRecon.start();
+                
+                isPlayingRecon = true;
+                btnPlayRecon.innerHTML = `${iconStop} Aturar Reconstrucció`;
+                btnPlayRecon.className = "w-full py-2.5 bg-purple-200 hover:bg-purple-300 text-purple-800 font-semibold rounded-lg transition-colors border border-purple-400 flex justify-center items-center gap-2 shadow-inner";
+            }
+        }
 
         // Redimensionar canvas automàticament
         function resizeCanvas() {
@@ -205,7 +350,7 @@
             return Math.sin(Math.PI * x) / (Math.PI * x);
         }
 
-        // Actualitzar interfície i dades
+        // Actualitzar interfície, dades i àudio en temps real
         function updateState() {
             f = parseInt(sliderSignal.value);
             fs = parseInt(sliderSample.value);
@@ -225,10 +370,22 @@
                 statusPanel.className = "mt-8 p-4 rounded-xl transition-colors duration-300 border-2 bg-amber-50 border-amber-300 text-amber-900";
                 statusIcon.innerHTML = iconWarning;
                 statusTitle.textContent = "Avís d'Aliàsing";
-                statusMessage.innerHTML = `La freqüència de mostreig (<strong>${fs} Hz</strong>) és insuficient per un senyal de <strong>${f} Hz</strong>. Això provoca un solapament de freqüències (aliàsing) i una reconstrucció errònia.`;
+                statusMessage.innerHTML = `La freqüència de mostreig (<strong>${fs} Hz</strong>) és insuficient per un senyal de <strong>${f} Hz</strong>. Això provoca un solapament de freqüències (aliàsing) i una distorsió de l'ona final.`;
             }
 
-            draw();
+            draw(); // Això actualitzarà 'reconstructedMaxAmplitude'
+            
+            // Actualitzar els oscil·ladors d'àudio en temps real si estan sonant
+            if (audioCtx && audioCtx.state !== 'suspended') {
+                if (isPlayingOriginal && oscOriginal) {
+                    oscOriginal.frequency.setTargetAtTime(f * 100, audioCtx.currentTime, 0.05);
+                }
+                if (isPlayingRecon && oscRecon && reconGainNode) {
+                    let aliasFreq = getAliasFrequency(f, fs);
+                    oscRecon.frequency.setTargetAtTime(aliasFreq * 100, audioCtx.currentTime, 0.05);
+                    reconGainNode.gain.setTargetAtTime(reconstructedMaxAmplitude, audioCtx.currentTime, 0.05);
+                }
+            }
         }
 
         // Dibuixar elements al canvas
@@ -282,6 +439,8 @@
 
             // 2. Calcular i dibuixar la Reconstrucció (Interpolació de Whittaker-Shannon)
             ctx.beginPath();
+            reconstructedMaxAmplitude = 0; // Reiniciem el càlcul de l'amplitud màxima
+
             for (let t = 0; t <= 1; t += dt) {
                 let xr = 0;
                 // Agrupem mostres d'abans i després per minimitzar l'efecte de vora en la visualització
@@ -294,12 +453,21 @@
                     xr += sampleValue * sinc(fs * (t - ts));
                 }
 
+                // Guardem l'amplitud màxima per aplicar-la després a l'àudio
+                if (Math.abs(xr) > reconstructedMaxAmplitude) {
+                    reconstructedMaxAmplitude = Math.abs(xr);
+                }
+
                 const px = t * width;
                 const py = midY - (xr * amplitude);
                 
                 if (t === 0) ctx.moveTo(px, py);
                 else ctx.lineTo(px, py);
             }
+
+            // Assegurem que l'amplitud no superi el límit normalitzat per possibles errors de vora
+            reconstructedMaxAmplitude = Math.min(reconstructedMaxAmplitude, 1.0);
+
             ctx.strokeStyle = '#9333ea'; // Lila
             ctx.lineWidth = 2.5;
             ctx.stroke();
@@ -332,9 +500,13 @@
             }
         }
 
-        // Escoltar els esdeveniments dels deslliçadors
+        // Escoltar els esdeveniments
         sliderSignal.addEventListener('input', updateState);
         sliderSample.addEventListener('input', updateState);
+        volumeSlider.addEventListener('input', updateVolume);
+        
+        btnPlayOriginal.addEventListener('click', toggleOriginal);
+        btnPlayRecon.addEventListener('click', toggleRecon);
 
         // Inicialització
         window.onload = () => {
